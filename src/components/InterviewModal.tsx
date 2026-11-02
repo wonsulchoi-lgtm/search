@@ -14,6 +14,8 @@ import {
   ChevronUp
 } from 'lucide-react';
 
+import { apiService } from '../services/apiService';
+
 interface InterviewModalProps {
   job: JobPosting | null;
   profile: CandidateProfile;
@@ -43,17 +45,9 @@ export const InterviewModal: React.FC<InterviewModalProps> = ({
     const fetchInterviewQuestions = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch('/api/generate-interview', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            companyName: job.companyName,
-            jobTitle: job.jobTitle,
-          }),
-        });
-        const data = await response.json();
-        if (isMounted && data.questions) {
-          setQuestions(data.questions);
+        const data = await apiService.generateInterview(job);
+        if (isMounted && Array.isArray(data)) {
+          setQuestions(data);
         }
       } catch (err) {
         console.error(err);

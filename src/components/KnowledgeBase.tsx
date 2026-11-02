@@ -12,6 +12,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { MANUFACTURING_KPIS, ManufacturingKPI } from '../server/knowledge';
+import { apiService } from '../services/apiService';
 
 export const KnowledgeBase: React.FC = () => {
   const [kpis, setKpis] = useState<ManufacturingKPI[]>(MANUFACTURING_KPIS);
@@ -21,14 +22,11 @@ export const KnowledgeBase: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/knowledge/kpi')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.kpis && data.kpis.length > 0) {
-          setKpis(data.kpis);
-        }
-      })
-      .catch((err) => console.error('Failed to load KPIs from backend:', err));
+    apiService.getKnowledge().then((data) => {
+      if (data && data.length > 0) {
+        setKpis(data);
+      }
+    });
   }, []);
 
   const categories = ['전체', '가동률', '납기/공급망', '생산성', '품질/공정', '현장관리'];

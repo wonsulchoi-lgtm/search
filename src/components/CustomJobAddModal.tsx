@@ -10,6 +10,7 @@ import {
   FileText
 } from 'lucide-react';
 import { JobPosting } from '../types';
+import { apiService } from '../services/apiService';
 
 interface CustomJobAddModalProps {
   onClose: () => void;
@@ -46,23 +47,9 @@ export const CustomJobAddModal: React.FC<CustomJobAddModalProps> = ({
     setErrorMsg('');
 
     try {
-      const response = await fetch('/api/jobs/custom-analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyName, jobText }),
-      });
-
-      if (!response.ok) {
-        throw new Error('서버 분석 요청 실패');
-      }
-
-      const data = await response.json();
-      if (data.job) {
-        onJobAdded(data.job);
-        onClose();
-      } else {
-        throw new Error('공고 분석 결과를 생성하지 못했습니다.');
-      }
+      const job = await apiService.addCustomJob(companyName, jobText);
+      onJobAdded(job);
+      onClose();
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || '공고 분석 중 오류가 발생했습니다.');

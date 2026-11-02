@@ -10,6 +10,7 @@ import {
   INITIAL_JOB_POSTINGS, 
   GYEONGNAM_EXPANDED_POSTINGS 
 } from './data/mockJobs';
+import { apiService, calculateClientFitScore } from './services/apiService';
 import { Header } from './components/Header';
 import { BriefingSummaryCard } from './components/BriefingSummaryCard';
 import { JobTable } from './components/JobTable';
@@ -32,13 +33,13 @@ import {
   Target, 
   MessageSquare, 
   BookmarkCheck, 
-  Sparkles,
-  Layers,
-  BookOpen
+  Sparkles, 
+  Layers, 
+  BookOpen 
 } from 'lucide-react';
 
 export default function App() {
-  // 1. Candidate Profile State (with backend sync)
+  // 1. Candidate Profile State
   const [profile, setProfile] = useState<CandidateProfile>(INITIAL_CANDIDATE_PROFILE);
 
   // 2. Active Tab
@@ -57,55 +58,47 @@ export default function App() {
   // 4. Jobs & Custom Jobs list
   const [jobList, setJobList] = useState<JobPosting[]>(INITIAL_JOB_POSTINGS);
 
-  // 5. Application Tracker State (with backend sync)
+  // 5. Application Tracker State
   const [trackerItems, setTrackerItems] = useState<ApplicationTrackerItem[]>([]);
 
-  // Load initial profile, jobs, and tracker from backend
+  // Load initial profile, jobs, and tracker safely using apiService
   useEffect(() => {
-    // 1. Load Profile from backend
-    fetch('/api/profile')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && data.major) setProfile(data);
-      })
-      .catch((err) => console.log('Using local profile fallback', err));
+    let isMounted = true;
 
-    // 2. Load Tracker from backend
-    fetch('/api/tracker')
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) setTrackerItems(data);
-      })
-      .catch((err) => console.log('Using local tracker fallback', err));
+    async function loadInitialData() {
+      try {
+        const [loadedProfile, loadedTracker, loadedJobs] = await Promise.all([
+          apiService.getProfile(),
+          apiService.getTracker(),
+          apiService.getJobs(profile.includeGyeongnam),
+        ]);
 
-    // 3. Load Jobs from backend
-    fetch('/api/jobs')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && Array.isArray(data.jobs) && data.jobs.length > 0) {
-          setJobList(data.jobs);
+        if (isMounted) {
+          if (loadedProfile) setProfile(loadedProfile);
+          if (loadedTracker) setTrackerItems(loadedTracker);
+          if (loadedJobs && loadedJobs.length > 0) setJobList(loadedJobs);
         }
-      })
-      .catch((err) => console.log('Using local jobs fallback', err));
+      } catch (err) {
+        console.error('Initialization fallback:', err);
+      }
+    }
+
+    loadInitialData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Sync profile update to backend
+  // Save profile update
   const handleSaveProfile = async (updated: CandidateProfile) => {
     setProfile(updated);
     try {
-      await fetch('/api/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated),
-      });
-      // Refresh jobs from backend with updated profile
-      const res = await fetch(`/api/jobs?includeGyeongnam=${updated.includeGyeongnam}`);
-      const data = await res.json();
-      if (data && Array.isArray(data.jobs)) {
-        setJobList(data.jobs);
-      }
+      await apiService.updateProfile(updated);
+      const jobs = await apiService.getJobs(updated.includeGyeongnam);
+      if (jobs && jobs.length > 0) setJobList(jobs);
     } catch (e) {
-      console.error('Failed to save profile to backend:', e);
+      console.error(e);
     }
   };
 
@@ -170,16 +163,12 @@ export default function App() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      const res = await fetch(`/api/jobs?includeGyeongnam=${profile.includeGyeongnam}`);
-      const data = await res.json();
-      if (data && Array.isArray(data.jobs)) {
-        setJobList(data.jobs);
-      }
-      const trackerRes = await fetch('/api/tracker');
-      const trackerData = await trackerRes.json();
-      if (Array.isArray(trackerData)) {
-        setTrackerItems(trackerData);
-      }
+      const [jobs, tracker] = await Promise.all([
+        apiService.getJobs(profile.includeGyeongnam),
+        apiService.getTracker(),
+      ]);
+      if (jobs && jobs.length > 0) setJobList(jobs);
+      if (tracker) setTrackerItems(tracker);
     } catch (err) {
       console.error(err);
     } finally {
@@ -187,14 +176,12 @@ export default function App() {
     }
   };
 
-  // Tracker CRUD synced with backend
+  // Tracker CRUD synced with apiService
   const handleToggleTrack = async (job: JobPosting) => {
     const exists = trackerItems.find((item) => item.jobId === job.id);
     if (exists) {
-      try {
-        await fetch(`/api/tracker/${job.id}`, { method: 'DELETE' });
-      } catch (e) { console.error(e); }
-      setTrackerItems((prev) => prev.filter((item) => item.jobId !== job.id));
+      const updated = await apiService.deleteTrackerItem(job.id);
+      setTrackerItems(updated);
     } else {
       const newItem: ApplicationTrackerItem = {
         jobId: job.id,
@@ -203,35 +190,19 @@ export default function App() {
         status: '관심',
         appliedDate: new Date().toISOString().split('T')[0],
       };
-      try {
-        await fetch('/api/tracker', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newItem),
-        });
-      } catch (e) { console.error(e); }
-      setTrackerItems((prev) => [...prev, newItem]);
+      const updated = await apiService.addTrackerItem(newItem);
+      setTrackerItems(updated);
     }
   };
 
   const handleUpdateStatus = async (jobId: string, newStatus: ApplicationTrackerItem['status']) => {
-    try {
-      await fetch(`/api/tracker/${jobId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-    } catch (e) { console.error(e); }
-    setTrackerItems((prev) =>
-      prev.map((item) => (item.jobId === jobId ? { ...item, status: newStatus } : item))
-    );
+    const updated = await apiService.updateTrackerItem(jobId, { status: newStatus });
+    setTrackerItems(updated);
   };
 
   const handleRemoveTrackItem = async (jobId: string) => {
-    try {
-      await fetch(`/api/tracker/${jobId}`, { method: 'DELETE' });
-    } catch (e) { console.error(e); }
-    setTrackerItems((prev) => prev.filter((item) => item.jobId !== jobId));
+    const updated = await apiService.deleteTrackerItem(jobId);
+    setTrackerItems(updated);
   };
 
   // Add custom job callback
@@ -416,7 +387,7 @@ export default function App() {
       {/* Footer */}
       <footer className="border-t border-slate-900 bg-slate-950 py-5 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p>© 2026 미래모빌리티 신입 생산관리 취업 지원 AI 에이전트 • Full-Stack RTSC API 구동 중</p>
+          <p>© 2026 미래모빌리티 신입 생산관리 취업 지원 AI 에이전트 • Vercel & Cloud Run 상호 호환 아키텍처</p>
           <div className="flex items-center gap-4 text-[11px] text-slate-400">
             <span>부산·울산·경북 미래차 제조산업 특화</span>
             <span>•</span>

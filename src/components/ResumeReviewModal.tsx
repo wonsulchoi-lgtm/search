@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Tag
 } from 'lucide-react';
+import { apiService } from '../services/apiService';
 
 interface ResumeReviewModalProps {
   onClose: () => void;
@@ -38,12 +39,7 @@ export const ResumeReviewModal: React.FC<ResumeReviewModalProps> = ({ onClose })
     if (!resumeText.trim() || isLoading) return;
     setIsLoading(true);
     try {
-      const response = await fetch('/api/resume/review', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resumeText, targetJobTitle }),
-      });
-      const data = await response.json();
+      const data = await apiService.reviewResume(resumeText, targetJobTitle);
       setResult(data);
     } catch (err) {
       console.error(err);

@@ -11,6 +11,7 @@ import {
   Loader2,
   Lightbulb
 } from 'lucide-react';
+import { apiService } from '../services/apiService';
 
 interface ConsultantChatProps {
   profile: CandidateProfile;
@@ -65,21 +66,11 @@ export const ConsultantChat: React.FC<ConsultantChatProps> = ({
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [...messages, userMsg],
-          userProfile: profile,
-          currentJob: selectedJob,
-        }),
-      });
-
-      const data = await response.json();
+      const reply = await apiService.sendChat([...messages, userMsg], profile, selectedJob);
       const assistantMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'assistant',
-        content: data.reply || '답변을 불러오지 못했습니다. 다시 시도해 주세요.',
+        content: reply,
         timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -89,7 +80,7 @@ export const ConsultantChat: React.FC<ConsultantChatProps> = ({
       const errorMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'assistant',
-        content: '네트워크 통신 중 오류가 발생했습니다. 잠시 후 다시 질문해 주세요.',
+        content: '네트워크 연결 상태를 확인 후 다시 질문해 주세요.',
         timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errorMsg]);

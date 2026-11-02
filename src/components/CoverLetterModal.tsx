@@ -12,6 +12,7 @@ import {
   RefreshCw,
   AlertCircle
 } from 'lucide-react';
+import { apiService } from '../services/apiService';
 
 interface CoverLetterModalProps {
   job: JobPosting | null;
@@ -37,18 +38,7 @@ export const CoverLetterModal: React.FC<CoverLetterModalProps> = ({
     const generateTailoredContent = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch('/api/generate-cover-letter', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            companyName: job.companyName,
-            jobTitle: job.jobTitle,
-            workLocation: `${job.workLocation.region} ${job.workLocation.district}`,
-            mainTasks: job.jobDetails.mainTasks,
-          }),
-        });
-
-        const data = await response.json();
+        const data = await apiService.generateCoverLetter(job);
         if (isMounted) {
           setResumeBullets(data.resumeBullets || job.strategyAnalysis.resumeHighlightPoints);
           setCoverLetterParagraph(data.coverLetterParagraph || '');
