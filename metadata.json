@@ -1,0 +1,8 @@
+{
+  "name": "미래모빌리티 생산관리 취업 AI 에이전트",
+  "description": "부산·울산·경북 미래모빌리티 및 자동차 제조산업 신입 생산관리 맞춤형 RTSC 취업 컨설턴트 및 공고 분석 에이전트",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
